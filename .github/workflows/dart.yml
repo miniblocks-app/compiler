@@ -83,9 +83,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            artifacts/app-release.apk
-            artifacts/FlutterIpaExport.ipa
+          file: artifacts/*
+          file_glob: true
           tag: v1.0
           overwrite: true
           body: "This is the first release with both Android and iOS binaries."
