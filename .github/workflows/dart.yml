@@ -60,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ios-ipa
-          path: build/ios/iphoneos/app-release.ipa
+          path: build/ios/iphoneos/FlutterIpaExport.ipa
 
   create-release:
     name: Create GitHub Release
