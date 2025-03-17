@@ -17,13 +17,17 @@ jobs:
     steps:
       - name: Download Flutter App Code from Firebase
         run: |
+          # Download the ZIP file
           curl -L "${{ github.event.inputs.code_zip_url }}" -o flutter_app.zip
+          # Quick check to confirm the file is present
+          ls -l flutter_app.zip || true
+          file flutter_app.zip || true
 
       - name: Unzip Flutter App Code
         id: extract
         run: |
-          # Remove everything except .github to avoid overwriting your workflow files
-          find . -maxdepth 1 ! -name '.github' ! -name '.' -exec rm -rf {} +
+          # Remove everything except .github, the '.' directory, and flutter_app.zip
+          find . -maxdepth 1 ! -name '.github' ! -name '.' ! -name 'flutter_app.zip' -exec rm -rf {} +
           
           # Unzip into current directory
           unzip -o flutter_app.zip -d .
