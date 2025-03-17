@@ -1,8 +1,15 @@
 name: Build and Release
 
 on:
-  workflow_dispatch:     # Allows manual triggering in GitHub
-  repository_dispatch:   # Allows triggering from the backend via the GitHub API
+  # 1) Allows manually triggering from GitHub's Actions tab
+  workflow_dispatch:
+    inputs:
+      zip_data:
+        description: "Base64-encoded Flutter project zip (optional)"
+        required: false
+
+  # 2) Allows external triggers (like your Go backend)
+  repository_dispatch:
     types: [flutter_project_submission]
 
 jobs:
@@ -10,55 +17,140 @@ jobs:
     name: Android Build
     runs-on: ubuntu-latest
     steps:
+      # (A) Check out this repository (needed if you rely on scripts or configs in the repo)
       - uses: actions/checkout@v3
+
+      # (B) Extract zip_data from either repository_dispatch or workflow_dispatch
+      - name: Determine zip_data
+        id: set_zip_data
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "zip_data=${{ github.event.client_payload.zip_data }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "zip_data=${{ github.event.inputs.zip_data }}" >> $GITHUB_OUTPUT
+          else
+            echo "zip_data=" >> $GITHUB_OUTPUT
+          fi
+
+      # (C) Decode and unzip user code if provided
+      - name: Decode user code
+        if: ${{ steps.set_zip_data.outputs.zip_data != '' }}
+        run: |
+          echo "${{ steps.set_zip_data.outputs.zip_data }}" | base64 -d > user_code.zip
+          unzip -o user_code.zip -d user_project
+
+      # (D) Set up Flutter
       - uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
+
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - run: flutter pub get
-      - run: flutter build apk --release
+      # (E) Install dependencies & build
+      - name: Install dependencies
+        run: |
+          if [ -d "user_project" ]; then
+            cd user_project
+            flutter pub get
+          else
+            flutter pub get
+          fi
 
+      - name: Build Android APK
+        run: |
+          if [ -d "user_project" ]; then
+            cd user_project
+            flutter build apk --release
+          else
+            flutter build apk --release
+          fi
+
+      # (F) Upload the resulting APK
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v3
         with:
           name: android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            user_project/build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-release.apk
 
   build-ios:
     name: iOS Build
     runs-on: macos-latest
     steps:
+      # (A) Check out this repository
       - uses: actions/checkout@v3
+
+      # (B) Extract zip_data
+      - name: Determine zip_data
+        id: set_zip_data
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "zip_data=${{ github.event.client_payload.zip_data }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "zip_data=${{ github.event.inputs.zip_data }}" >> $GITHUB_OUTPUT
+          else
+            echo "zip_data=" >> $GITHUB_OUTPUT
+          fi
+
+      # (C) Decode and unzip user code if provided
+      - name: Decode user code
+        if: ${{ steps.set_zip_data.outputs.zip_data != '' }}
+        run: |
+          echo "${{ steps.set_zip_data.outputs.zip_data }}" | base64 -d > user_code.zip
+          unzip -o user_code.zip -d user_project
+
+      # (D) Set up Flutter
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - run: flutter pub get
+      # (E) Install dependencies & build iOS
+      - name: Install dependencies
+        run: |
+          if [ -d "user_project" ]; then
+            cd user_project
+            flutter pub get
+          else
+            flutter pub get
+          fi
 
       - run: pod repo update
         working-directory: ios
+        # If building from user_project, adapt the path above accordingly if user_project/ios exists
 
-      - run: flutter build ios --release --no-codesign
+      - name: Build iOS Release
+        run: |
+          if [ -d "user_project" ]; then
+            cd user_project
+            flutter build ios --release --no-codesign
+          else
+            flutter build ios --release --no-codesign
+          fi
 
+      # (F) Pack into .ipa
       - run: mkdir Payload
         working-directory: build/ios/iphoneos
+        # If user_project is used, adapt to user_project/build/ios/iphoneos
 
       - run: mv Runner.app/ Payload
         working-directory: build/ios/iphoneos
+        # Adapt path if needed
 
       - name: Zip output
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
         working-directory: build/ios/iphoneos
+        # Adapt path if needed
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v3
         with:
           name: ios-ipa
           path: build/ios/iphoneos/FlutterIpaExport.ipa
+          # If user_project is used, adapt path to user_project/build/ios/iphoneos/...
 
   create-release:
     name: Create GitHub Release
