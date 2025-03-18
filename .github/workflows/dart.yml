@@ -20,11 +20,11 @@ jobs:
           channel: 'stable'
 
       - run: flutter pub get
-
       - run: flutter build apk --release
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v2
+        # Vendored action in your repo instead of actions/upload-artifact@v2 or @v3
+        uses: ./.github/actions/upload-artifact
         with:
           name: android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -57,7 +57,7 @@ jobs:
         working-directory: build/ios/iphoneos
 
       - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v2
+        uses: ./.github/actions/upload-artifact
         with:
           name: ios-ipa
           path: build/ios/iphoneos/FlutterIpaExport.ipa
@@ -68,13 +68,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Download Android APK
-        uses: actions/download-artifact@v2
+        uses: ./.github/actions/download-artifact
         with:
           name: android-apk
           path: artifacts
 
       - name: Download iOS IPA
-        uses: actions/download-artifact@v2
+        uses: ./.github/actions/download-artifact
         with:
           name: ios-ipa
           path: artifacts
