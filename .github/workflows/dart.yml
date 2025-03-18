@@ -6,7 +6,7 @@ on:
 jobs:
   build-android:
     name: Android Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
 
@@ -65,7 +65,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs: [build-android, build-ios]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Download Android APK
         uses: actions/download-artifact@v3
