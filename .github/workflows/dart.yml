@@ -6,7 +6,7 @@ on:
 jobs:
   build-android:
     name: Android Build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
@@ -65,7 +65,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs: [build-android, build-ios]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       # IMPORTANT: We must check out the repo in this job so the local actions (./.github/actions/...) exist
       - uses: actions/checkout@v3
