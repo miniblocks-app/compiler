@@ -52,13 +52,6 @@ jobs:
       - run: flutter pub get
       - run: flutter build apk --release
 
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Build Android Release APK
-        run: flutter build apk --release
-
-
       - name: Upload APK Artifact
         # Vendored upload-artifact action in .github/actions/upload-artifact
         uses: ./.github/actions/upload-artifact
