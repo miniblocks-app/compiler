@@ -26,7 +26,9 @@ jobs:
           mkdir code
           unzip -o flutter_app.zip -d code
           echo "Unzipped Flutter app to ./code"
-      
+
+      - uses: actions/checkout@v3
+
       - name: Upload Code as Artifact
         # Either use your local vendored "upload-artifact" or the official one:
         uses: ./.github/actions/upload-artifact
