@@ -8,37 +8,51 @@ on:
         required: true
 
 jobs:
-  # Download and unzip the Flutter code
   fetch-flutter-code:
     name: Fetch Flutter Code
     runs-on: ubuntu-latest
-    outputs:
-      code-path: ${{ steps.extract.outputs.code-path }}
     steps:
+      # 1) Checkout so local custom actions exist, but don't remove unzipped code:
+      - uses: actions/checkout@v3
+        with:
+          clean: false
+
       - name: Download Flutter App Code from Firebase
         run: |
-          # Download the ZIP file
           curl -L "${{ github.event.inputs.code_zip_url }}" -o flutter_app.zip
-          # Quick check to confirm the file is present
+          echo "Downloaded flutter_app.zip..."
           ls -l flutter_app.zip || true
           file flutter_app.zip || true
 
       - name: Unzip Flutter App Code
-        id: extract
         run: |
-          # Remove everything except .github, the '.' directory, and flutter_app.zip
-          find . -maxdepth 1 ! -name '.github' ! -name '.' ! -name 'flutter_app.zip' -exec rm -rf {} +
-          
-          # Unzip into current directory
-          unzip -o flutter_app.zip -d .
-          echo "code-path=." >> $GITHUB_OUTPUT
+          mkdir code
+          unzip -o flutter_app.zip -d code
+          echo "Unzipped Flutter app to ./code"
+          echo "Listing code directory:"
+          ls -R code
+
+      - name: Upload Code as Artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: flutter-code
+          # Use a wildcard so your local upload action sees all nested files
+          path: code/**
+          # If your local action supports directories directly, "code/" may also work.
+          # But "code/**" is safest for full recursion.
 
   build-android:
     name: Android Build
     runs-on: ubuntu-latest
-    needs: fetch-flutter-code
+    needs: [fetch-flutter-code]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3  # to access local custom actions if needed
+
+      - name: Download Flutter Code
+        uses: ./.github/actions/download-artifact
+        with:
+          name: flutter-code
+          path: code
 
       - uses: actions/setup-java@v3
         with:
@@ -49,61 +63,68 @@ jobs:
         with:
           channel: 'stable'
 
-      - run: flutter pub get
-      - run: flutter build apk --release
+      - name: Get Dependencies
+        run: cd code && flutter pub get
+
+      - name: Build Android APK (Release)
+        run: cd code && flutter build apk --release
 
       - name: Upload APK Artifact
-        # Vendored upload-artifact action in .github/actions/upload-artifact
         uses: ./.github/actions/upload-artifact
         with:
           name: android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: code/build/app/outputs/flutter-apk/app-release.apk
 
   build-ios:
     name: iOS Build
     runs-on: macos-latest
-    needs: fetch-flutter-code
+    needs: [fetch-flutter-code]
     steps:
       - uses: actions/checkout@v3
+
+      - name: Download Flutter Code
+        uses: ./.github/actions/download-artifact
+        with:
+          name: flutter-code
+          path: code
 
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Get dependencies
-        run: flutter pub get
+      - name: Get Dependencies
+        run: cd code && flutter pub get
 
-      - run: pod repo update
-        working-directory: ios
+      - name: Update Pod repo
+        run: cd code/ios && pod repo update
 
-      - name: Build iOS Release
-        run: flutter build ios --release --no-codesign
+      - name: Build iOS Release (no-codesign)
+        run: cd code && flutter build ios --release --no-codesign
 
       - name: Create Payload folder
         run: mkdir Payload
-        working-directory: build/ios/iphoneos
+        working-directory: code/build/ios/iphoneos
 
       - name: Move Runner.app into Payload
         run: mv Runner.app/ Payload
-        working-directory: build/ios/iphoneos
+        working-directory: code/build/ios/iphoneos
 
-      - name: Zip output
+      - name: Zip output (IPA)
         run: zip -qq -r -9 FlutterIpaExport.ipa Payload
-        working-directory: build/ios/iphoneos
+        working-directory: code/build/ios/iphoneos
 
       - name: Upload IPA Artifact
         uses: ./.github/actions/upload-artifact
         with:
           name: ios-ipa
-          path: build/ios/iphoneos/FlutterIpaExport.ipa
+          path: code/build/ios/iphoneos/FlutterIpaExport.ipa
 
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build-android, build-ios]
     steps:
-      # IMPORTANT: We must check out the repo in this job so the local actions (./.github/actions/...) exist
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3  # If you need local custom actions here
 
       - name: Download Android APK
         uses: ./.github/actions/download-artifact
@@ -125,4 +146,4 @@ jobs:
           file_glob: true
           tag: v1.0
           overwrite: true
-          body: "This is the first release with both Android and iOS binaries."
+          body: "This is the release built exclusively from the ZIP file."
