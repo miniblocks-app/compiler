@@ -29,7 +29,7 @@ jobs:
       
       - name: Upload Code as Artifact
         # Either use your local vendored "upload-artifact" or the official one:
-        uses: actions/upload-artifact@v3
+        uses: ./.github/actions/upload-artifact
         with:
           name: flutter-code
           path: code/
@@ -45,7 +45,7 @@ jobs:
 
       - name: Download Flutter Code
         # Download the artifact from the "fetch-flutter-code" job
-        uses: actions/download-artifact@v3
+        uses: ./.github/actions/download-artifact
         with:
           name: flutter-code
           path: code  # Put it into a folder named `code` in this job's workspace
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Download Flutter Code
-        uses: actions/download-artifact@v3
+        uses: ./.github/actions/download-artifact
         with:
           name: flutter-code
           path: code
