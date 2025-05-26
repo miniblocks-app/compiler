@@ -59,7 +59,8 @@ jobs:
         working-directory: code
 
       - name: Build web (release)
-        run: flutter build web --release
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
         working-directory: code
 
       - name: Upload web bundle
