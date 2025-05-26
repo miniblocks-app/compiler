@@ -5,41 +5,63 @@ on:
   workflow_dispatch:
     inputs:
       code_zip_url:
-        description: 'URL of the code zip file'
+        description: "Firebase link (or any URL) to the ZIP file containing the Flutter app code"
         required: true
-      build_type:
-        description: 'Type of build (web)'
-        required: true
-        default: 'web'
 
 jobs:
-  build:
+#----------------------------------------------------------------#
+# 1) Fetch the zipped code and store it as an artifact (exactly   #
+#    the same pattern you use in Build and Release)               #
+#----------------------------------------------------------------#
+  fetch-flutter-code:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3            # so the local actions are available
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.0'
-          channel: stable
-
-      - name: Download code
+      - name: Download Flutter app ZIP
         run: |
-          curl -L "${{ github.event.inputs.code_zip_url }}" -o code.zip
-          unzip code.zip -d flutter_project
+          curl -L "${{ github.event.inputs.code_zip_url }}" -o flutter_app.zip
+          mkdir code
+          unzip -o flutter_app.zip -d code
+
+      - name: Upload code as artifact
+        uses: ./.github/actions/upload-artifact  # ← your local composite action
+        with:
+          name: flutter-code
+          path: code/**                          # keep the wildcard for deep recursion
+
+#----------------------------------------------------------------#
+# 2) Build the web bundle from that artifact                     #
+#----------------------------------------------------------------#
+  build-web:
+    runs-on: ubuntu-latest
+    needs: [fetch-flutter-code]
+
+    steps:
+      - uses: actions/checkout@v3            # again, for local actions
+
+      - name: Download code artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          name: flutter-code
+          path: code                          # will place sources in ./code
+
+      # Pin the Flutter action to the latest published release
+      - uses: subosito/flutter-action@v2.19.0 # a real tag, not the rolling @v2 alias
+        with:
+          channel: stable
+          flutter-version: "3.19.0"
 
       - name: Get dependencies
         run: flutter pub get
-        working-directory: flutter_project        # <- make sure commands run in the right dir
+        working-directory: code               # one liner > cd …
 
-      - name: Build web
+      - name: Build web release
         run: flutter build web --release
-        working-directory: flutter_project
+        working-directory: code
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4          # <- updated tag
+      - name: Upload web bundle
+        uses: ./.github/actions/upload-artifact
         with:
           name: web-build
-          path: flutter_project/build/web         # path syntax is still valid
-          retention-days: 1
+          path: code/build/web
