@@ -5,34 +5,36 @@ on:
   workflow_dispatch:
     inputs:
       code_zip_url:
-        description: "Firebase link (or any URL) to the ZIP file containing the Flutter app code"
+        description: "Direct link (Firebase or any URL) to the ZIP file containing the Flutter app code"
         required: true
 
 jobs:
-#----------------------------------------------------------------#
-# 1) Fetch the zipped code and store it as an artifact (exactly   #
-#    the same pattern you use in Build and Release)               #
-#----------------------------------------------------------------#
+# ---------------------------------------------------------------- #
+# 1) Fetch the zipped code and store it as an artifact             #
+# ---------------------------------------------------------------- #
   fetch-flutter-code:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3            # so the local actions are available
+      # so local composite actions in ./.github/actions are available
+      - uses: actions/checkout@v3
+        with:
+          clean: false
 
-      - name: Download Flutter app ZIP
+      - name: Download Flutter source ZIP
         run: |
           curl -L "${{ github.event.inputs.code_zip_url }}" -o flutter_app.zip
           mkdir code
           unzip -o flutter_app.zip -d code
 
       - name: Upload code as artifact
-        uses: ./.github/actions/upload-artifact  # ← your local composite action
+        uses: ./.github/actions/upload-artifact
         with:
           name: flutter-code
-          path: code/**                          # keep the wildcard for deep recursion
+          path: code/**                       # recursive upload of entire tree
 
-#----------------------------------------------------------------#
-# 2) Build the web bundle from that artifact                     #
-#----------------------------------------------------------------#
+# ---------------------------------------------------------------- #
+# 2) Build the web bundle from that artifact                       #
+# ---------------------------------------------------------------- #
   build-web:
     runs-on: ubuntu-latest
     needs: [fetch-flutter-code]
@@ -44,19 +46,19 @@ jobs:
         uses: ./.github/actions/download-artifact
         with:
           name: flutter-code
-          path: code                          # will place sources in ./code
+          path: code                         # sources will be in ./code
 
-      # Pin the Flutter action to the latest published release
-      - uses: subosito/flutter-action@v2.19.0 # a real tag, not the rolling @v2 alias
+      # Pin the action itself to a release tag to avoid 504 timeouts
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.19.0
         with:
-          channel: stable
-          flutter-version: "3.19.0"
+          channel: stable                    # pulls latest stable (currently 3.32.0)
 
-      - name: Get dependencies
+      - name: Install dependencies
         run: flutter pub get
-        working-directory: code               # one liner > cd …
+        working-directory: code
 
-      - name: Build web release
+      - name: Build web (release)
         run: flutter build web --release
         working-directory: code
 
@@ -65,3 +67,4 @@ jobs:
         with:
           name: web-build
           path: code/build/web
+          retention-days: 7                  # keep for a week
