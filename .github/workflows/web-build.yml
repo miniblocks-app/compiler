@@ -88,4 +88,29 @@ jobs:
         with:
           github_token: ${{ secrets.GHPAGES_TOKEN }}
           publish_dir: public
+
+      - name: Notify backend (always)
+        if: always()                       # run on success *or* failure
+        env:
+          WEBHOOK_URL: https://miniblocks-core-234407537699.europe-west1.run.app/api/github
+        run: |
+          conclusion="${{ job.status }}"   # 'success', 'failure', 'cancelled', …
+          cat >payload.json <<EOF
+          {
+            "action": "completed",
+            "workflow_run": {
+              "id": ${{ github.run_id }},
+              "name": "${{ github.workflow }}",
+              "status": "completed",
+              "conclusion": "$conclusion",
+              "html_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+          }
+          EOF
+
+          echo "Sending workflow result ($conclusion) to backend…"
+          curl --silent --show-error --fail \
+               -H "Content-Type: application/json" \
+               --data @payload.json \
+               "$WEBHOOK_URL"
           
