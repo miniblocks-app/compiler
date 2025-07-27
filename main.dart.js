@@ -43894,7 +43894,7 @@ A.mc.prototype={
 av(){return new A.y_()}}
 A.y_.prototype={
 Y(a){var s=null
-return new A.xi("Hello World",s,s,s,s)}}
+return new A.xi("Hello World!",s,s,s,s)}}
 A.aO.prototype={
 bG(a){var s=a.a,r=this.a,q=s[15]
 r.$flags&2&&A.a7(r)
